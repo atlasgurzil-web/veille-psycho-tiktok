@@ -1,0 +1,28 @@
+{
+  "name": "veille-psycho-tiktok",
+  "version": "1.0.0",
+  "description": "Pipeline automatisé de veille en psychologie scientifique — génère des scripts TikTok en français à partir de publications PubMed et APA",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx trigger.dev@latest dev",
+    "deploy": "npx trigger.dev@latest deploy",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/generative-ai": "latest",
+    "@notionhq/client": "^5.25.2",
+    "@trigger.dev/sdk": "^3.0.0",
+    "rss-parser": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
