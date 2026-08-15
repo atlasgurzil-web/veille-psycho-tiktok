@@ -66,18 +66,23 @@ export const veillePsychoTask = schedules.task({
     }
 
     // ─────────────────────────────────────────────
-    // ÉTAPE 2 : Déduplication contre Notion
+    // ÉTAPE 2 : Déduplication contre Notion (Parallélisée)
     // ─────────────────────────────────────────────
     console.log("\n🔄 Étape 2 — Déduplication contre Notion...");
 
+    // Vérifie les doublons par lots de 10 en parallèle pour une vitesse maximale
+    const tailleLotDedup = 10;
     const articlesNouveaux: Article[] = [];
 
-    for (const article of tousLesArticles) {
-      // Vérifie si le DOI existe déjà dans Notion
-      const dejaTraite = await isDuplicate(article.doi);
-      if (!dejaTraite) {
-        articlesNouveaux.push(article);
-      }
+    for (let i = 0; i < tousLesArticles.length; i += tailleLotDedup) {
+      const lot = tousLesArticles.slice(i, i + tailleLotDedup);
+      const resultatsLot = await Promise.all(
+        lot.map(async (art) => {
+          const dejaTraite = await isDuplicate(art.doi);
+          return dejaTraite ? null : art;
+        })
+      );
+      articlesNouveaux.push(...resultatsLot.filter((art): art is Article => art !== null));
     }
 
     console.log(
