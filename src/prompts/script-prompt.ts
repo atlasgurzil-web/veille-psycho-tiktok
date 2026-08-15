@@ -17,9 +17,10 @@ INFORMATIONS DE L'ÉTUDE RÉELLE :
 - Angle d'attaque suggéré : ${angle}
 
 STRUCTURE OBLIGATOIRE DU SCRIPT :
-1. ACCROCHE (0-3 secondes) :
-   - Une phrase choc qui casse le scroll. Pas de "Bonjour à tous" ni de question bateau.
-   - Parle directement au spectateur ("tu").
+1. ACCROCHES (0-3 secondes) — Propose 3 VARIANTES DIFFÉRENTES :
+   - Variante 1 (Curiosité / Question choc) : Une question ou affirmation irrésistible.
+   - Variante 2 (Contre-intuitif / Mythe brisé) : Brise une croyance populaire.
+   - Variante 3 (POV / Tu fais ça sans le savoir) : Implique directement le spectateur.
 2. LE CONCEPT (3-10 secondes) :
    - Pose le problème ou le phénomène psychologique en termes simples de la vie de tous les jours.
 3. LA PREUVE SCIENTIFIQUE (10-20 secondes) :
@@ -36,7 +37,9 @@ Réponds UNIQUEMENT en JSON valide sans aucun formatage Markdown :
 {
   "titre": "Titre court et percutant de la vidéo",
   "titre_interne": "Titre d'organisation pour Notion",
-  "accroche": "La phrase exacte des 3 premières secondes",
+  "accroche_1": "Hook style Curiosité / Question choc",
+  "accroche_2": "Hook style Contre-intuitif / Mythe brisé",
+  "accroche_3": "Hook style POV / Tu fais ça sans le savoir",
   "concept_psy": "L'explication vulgarisée en 2-3 phrases",
   "la_preuve": "La preuve scientifique résumée",
   "insight": "Ce que ça change concrètement pour le spectateur",

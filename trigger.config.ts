@@ -13,8 +13,8 @@ export default defineConfig({
   // Niveau de log — "log" pour un suivi normal
   logLevel: "log",
 
-  // Durée maximale d'exécution autorisée pour les tâches (en secondes, ici 5 minutes)
-  maxDuration: 300,
+  // Durée maximale d'exécution autorisée pour les tâches (en secondes, ici 10 minutes)
+  maxDuration: 600,
 
   // Politique de retry en cas d'échec
   retries: {

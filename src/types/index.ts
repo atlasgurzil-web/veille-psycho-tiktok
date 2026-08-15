@@ -72,8 +72,14 @@ export interface TikTokScript {
   /** Titre interne pour organiser dans Notion (non visible par l'audience) */
   titreInterne: string;
 
-  /** Phrase d'accroche — les 3 premières secondes cruciales */
-  accroche: string;
+  /** Phrase d'accroche variante 1 — Style Curiosité / Question choc */
+  accroche1: string;
+
+  /** Phrase d'accroche variante 2 — Style Contre-intuitif / Mythe brisé */
+  accroche2: string;
+
+  /** Phrase d'accroche variante 3 — Style POV / Tu fais ça sans le savoir */
+  accroche3: string;
 
   /** Explication vulgarisée du concept psychologique */
   conceptPsy: string;

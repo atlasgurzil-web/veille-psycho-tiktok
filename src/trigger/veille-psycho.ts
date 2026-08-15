@@ -2,7 +2,7 @@
  * 🧠 VEILLE PSYCHO → SCRIPTS TIKTOK
  *
  * Tâche principale Trigger.dev — le cœur du pipeline.
- * Se déclenche automatiquement du lundi au vendredi à 7h (heure française).
+ * Se déclenche automatiquement chaque dimanche à 16h (heure française).
  *
  * Étapes :
  * 1. Récupère les publications récentes (PubMed + APA RSS)
@@ -18,7 +18,7 @@ import { fetchPubMedArticles } from "../services/pubmed.js";
 import { fetchAPAArticles } from "../services/apa-rss.js";
 import { scoreArticles } from "../services/scoring.js";
 import { generateScript } from "../services/script-generator.js";
-import { pushToNotion, isDuplicate } from "../services/notion.js";
+import { pushToNotion, isDuplicate, pushBacklogToNotion } from "../services/notion.js";
 import type { Article } from "../types/index.js";
 
 // ═══════════════════════════════════════════════════════════════
@@ -29,14 +29,14 @@ import type { Article } from "../types/index.js";
 const SCORE_MINIMUM = 21;
 
 // ═══════════════════════════════════════════════════════════════
-// TÂCHE PLANIFIÉE — CRON LUN-VEN 7H (HEURE FRANÇAISE)
+// TÂCHE PLANIFIÉE — CRON DIMANCHE 16H (HEURE FRANÇAISE, 1 SCRIPT/SEM)
 // ═══════════════════════════════════════════════════════════════
 
 export const veillePsychoTask = schedules.task({
   id: "veille-psycho-tiktok",
-  // Cron : 6h UTC = 7h heure française (CET+1) / 8h en été (CEST+2)
+  // Cron : 15h UTC = 16h heure française (CET+1) / 17h en été (CEST+2)
   // Ajuste selon la saison si besoin
-  cron: "0 6 * * 1-5",
+  cron: "0 15 * * 0",
   run: async () => {
     console.log("🧠 ═══════════════════════════════════════════════");
     console.log("🧠 Démarrage de la veille psycho — Scripts TikTok");
@@ -142,10 +142,23 @@ export const veillePsychoTask = schedules.task({
     const script = await generateScript(meilleur);
 
     console.log(`   ✅ Script généré : "${script.titreInterne}"`);
-    console.log(`   🪝 Accroche : "${script.accroche}"`);
+    console.log(`   🪝 Accroche : "${script.accroche1}"`);
     console.log(`   ⏱️ Durée cible : ${script.dureeCible}`);
     console.log(`   🎬 Format : ${script.format}`);
     console.log(`   #️⃣ Hashtags : ${script.hashtags.join(" ")}`);
+
+    // ─────────────────────────────────────────────
+    // ÉTAPE 5b : Sauvegarde du Top 3 en backlog
+    // ─────────────────────────────────────────────
+    console.log("\n📋 Étape 5b — Sauvegarde des articles #2 et #3 en backlog Notion...");
+
+    const backlogArticles = resultatsScoring.slice(1, 3);
+    for (const backlogItem of backlogArticles) {
+      if (backlogItem.scoreTotal >= SCORE_MINIMUM) {
+        await pushBacklogToNotion(backlogItem);
+      }
+    }
+    console.log(`   ✅ ${backlogArticles.filter(b => b.scoreTotal >= SCORE_MINIMUM).length} article(s) backlog sauvegardé(s)`);
 
     // ─────────────────────────────────────────────
     // ÉTAPE 6 : Push vers Notion

@@ -1,9 +1,8 @@
 /**
- * Service de scoring — Évalue le potentiel TikTok de chaque article via Gemini Flash.
+ * Service de scoring — Évalue le potentiel TikTok de chaque article.
  *
- * Envoie chaque article à Gemini 2.0 Flash pour obtenir un score sur 3 critères :
- * potentiel viral, simplicité d'explication et effet wow.
- * Les articles sont ensuite triés par score total décroissant.
+ * Utilise en priorité Groq (Llama 3.3 70B) pour un scoring ultra-rapide et illimité,
+ * avec bascule automatique (fallback) sur Google Gemini Flash si Groq n'est pas disponible.
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -11,7 +10,7 @@ import type { Article, ScoreResult } from "../types/index.js";
 import { buildScoringPrompt } from "../prompts/scoring-prompt.js";
 
 /**
- * Pause utilitaire — respecte les limites de débit de l'API Gemini.
+ * Pause utilitaire.
  *
  * @param ms - Durée de la pause en millisecondes
  */
@@ -20,10 +19,9 @@ function attendre(ms: number): Promise<void> {
 }
 
 /**
- * Nettoie la réponse de Gemini pour extraire le JSON.
- * Gemini ajoute parfois des backticks ou du texte autour du JSON.
+ * Nettoie la réponse IA pour extraire le JSON.
  *
- * @param texte - La réponse brute de Gemini
+ * @param texte - La réponse brute
  * @returns Le texte nettoyé, prêt à être parsé en JSON
  */
 function nettoyerReponseJSON(texte: string): string {
@@ -43,9 +41,68 @@ function nettoyerReponseJSON(texte: string): string {
 }
 
 /**
- * Fonction principale — Score tous les articles avec Gemini Flash.
- * Chaque article est évalué individuellement avec une pause de 500ms entre les appels.
- * Les articles qui échouent au parsing sont silencieusement ignorés.
+ * Évalue un article via l'API Groq (Llama 3.3 70B).
+ */
+async function scorerAvecGroq(
+  apiKey: string,
+  titre: string,
+  abstract: string
+): Promise<any> {
+  const prompt = buildScoringPrompt(titre, abstract);
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Groq HTTP ${response.status}: ${errorBody}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("Réponse vide de Groq");
+  }
+
+  return JSON.parse(nettoyerReponseJSON(content));
+}
+
+/**
+ * Évalue un article via Google AI Studio (Gemini Flash) - Fallback.
+ */
+async function scorerAvecGemini(
+  apiKey: string,
+  titre: string,
+  abstract: string
+): Promise<any> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-3.7-flash" });
+  const prompt = buildScoringPrompt(titre, abstract);
+  const resultat = await model.generateContent(prompt);
+  const reponse = resultat.response.text();
+  return JSON.parse(nettoyerReponseJSON(reponse));
+}
+
+/**
+ * Fonction principale — Score tous les articles.
+ *
+ * Utilise Groq en priorité pour scorer rapidement sans épuiser les quotas Gemini.
  *
  * @param articles - Liste des articles à évaluer
  * @returns Liste des résultats de scoring, triée par score total décroissant
@@ -53,22 +110,19 @@ function nettoyerReponseJSON(texte: string): string {
 export async function scoreArticles(
   articles: Article[]
 ): Promise<ScoreResult[]> {
+  const groqKey = process.env.GROQ_API_KEY;
+  const geminiKey = process.env.GOOGLE_AI_API_KEY;
+
+  const providerPrincipal = groqKey ? "Groq (Llama 3.3 70B)" : "Gemini Flash";
   console.log(
-    `[Scoring] 🚀 Début du scoring de ${articles.length} articles avec Gemini Flash...`
+    `[Scoring] 🚀 Début du scoring de ${articles.length} articles via ${providerPrincipal}...`
   );
 
-  /* Vérifie que la clé API est configurée */
-  const apiKey = process.env.GOOGLE_AI_API_KEY;
-  if (!apiKey) {
-    console.log(
-      "[Scoring] ❌ GOOGLE_AI_API_KEY manquante ! Configurez-la dans votre fichier .env"
-    );
-    return [];
-  }
-
-  /* Initialise le client Gemini */
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+  const pauseEntreAppels = groqKey ? 1000 : 6000;
+  const tempsEstime = Math.ceil((articles.length * (pauseEntreAppels / 1000)) / 60);
+  console.log(
+    `[Scoring] ⏱️ Temps estimé : ~${tempsEstime || 1} minute(s) (pause de ${pauseEntreAppels / 1000}s)`
+  );
 
   const resultats: ScoreResult[] = [];
 
@@ -78,52 +132,81 @@ export async function scoreArticles(
       `[Scoring] 📊 Évaluation ${i + 1}/${articles.length} : "${article.titre.slice(0, 60)}..."`
     );
 
-    try {
-      /* Construit le prompt et appelle Gemini */
-      const prompt = buildScoringPrompt(article.titre, article.abstract);
-      const resultat = await model.generateContent(prompt);
-      const reponse = resultat.response.text();
+    let reussi = false;
 
-      /* Nettoie et parse la réponse JSON */
-      const jsonPropre = nettoyerReponseJSON(reponse);
-      const scores = JSON.parse(jsonPropre);
+    // Tentative 1 : Groq si configuré
+    if (groqKey && !reussi) {
+      try {
+        const scores = await scorerAvecGroq(groqKey, article.titre, article.abstract);
 
-      /* Valide que les scores sont bien des nombres */
-      const scoreViral = Number(scores.score_viral) || 0;
-      const scoreSimplicite = Number(scores.score_simplicite) || 0;
-      const scoreWow = Number(scores.score_wow) || 0;
-      const scoreTotal = Number(scores.score_total) || (scoreViral + scoreSimplicite + scoreWow);
+        const scoreViral = Number(scores.score_viral) || 0;
+        const scoreSimplicite = Number(scores.score_simplicite) || 0;
+        const scoreWow = Number(scores.score_wow) || 0;
+        const scoreTotal = Number(scores.score_total) || (scoreViral + scoreSimplicite + scoreWow);
 
-      resultats.push({
-        article,
-        scoreViral,
-        scoreSimplicite,
-        scoreWow,
-        scoreTotal,
-        justification: scores.justification || "Pas de justification fournie",
-        angleTikTok: scores.angle_tiktok || "Angle non précisé",
-      });
+        resultats.push({
+          article,
+          scoreViral,
+          scoreSimplicite,
+          scoreWow,
+          scoreTotal,
+          justification: scores.justification || "Pas de justification fournie",
+          angleTikTok: scores.angle_tiktok || "Angle non précisé",
+        });
 
-      console.log(
-        `[Scoring] ✅ Score total : ${scoreTotal}/30 (viral: ${scoreViral}, simplicité: ${scoreSimplicite}, wow: ${scoreWow})`
-      );
-    } catch (erreur) {
-      /* En cas d'erreur (JSON invalide, erreur API...), on ignore l'article */
-      console.log(
-        `[Scoring] ⚠️ Impossible de scorer l'article "${article.titre.slice(0, 50)}..." — ${erreur}`
-      );
-      console.log(
-        "[Scoring] ℹ️ Cet article sera ignoré et on passe au suivant"
-      );
+        console.log(
+          `[Scoring] ✅ [Groq] Score : ${scoreTotal}/30 (viral: ${scoreViral}, simplicité: ${scoreSimplicite}, wow: ${scoreWow})`
+        );
+        reussi = true;
+      } catch (errGroq: any) {
+        console.log(
+          `[Scoring] ⚠️ Échec Groq pour "${article.titre.slice(0, 40)}..." (${errGroq?.message || errGroq}) — Bascule sur Gemini...`
+        );
+      }
     }
 
-    /* Pause de 500ms entre les appels pour respecter les limites Gemini */
+    // Tentative 2 / Fallback : Gemini
+    if (!reussi && geminiKey) {
+      try {
+        const scores = await scorerAvecGemini(geminiKey, article.titre, article.abstract);
+
+        const scoreViral = Number(scores.score_viral) || 0;
+        const scoreSimplicite = Number(scores.score_simplicite) || 0;
+        const scoreWow = Number(scores.score_wow) || 0;
+        const scoreTotal = Number(scores.score_total) || (scoreViral + scoreSimplicite + scoreWow);
+
+        resultats.push({
+          article,
+          scoreViral,
+          scoreSimplicite,
+          scoreWow,
+          scoreTotal,
+          justification: scores.justification || "Pas de justification fournie",
+          angleTikTok: scores.angle_tiktok || "Angle non précisé",
+        });
+
+        console.log(
+          `[Scoring] ✅ [Gemini] Score : ${scoreTotal}/30`
+        );
+        reussi = true;
+      } catch (errGemini: any) {
+        console.log(
+          `[Scoring] ❌ Échec Gemini pour "${article.titre.slice(0, 40)}..." : ${errGemini?.message || errGemini}`
+        );
+      }
+    }
+
+    if (!reussi) {
+      console.log(`[Scoring] ℹ️ Article ignoré`);
+    }
+
+    // Pause respectueuse des API
     if (i < articles.length - 1) {
-      await attendre(500);
+      await attendre(pauseEntreAppels);
     }
   }
 
-  /* Trie les résultats par score total décroissant (meilleurs en premier) */
+  /* Trie les résultats par score total décroissant */
   resultats.sort((a, b) => b.scoreTotal - a.scoreTotal);
 
   console.log(

@@ -6,7 +6,7 @@
  */
 
 import { Client } from "@notionhq/client";
-import type { TikTokScript } from "../types/index.js";
+import type { TikTokScript, ScoreResult } from "../types/index.js";
 
 /**
  * Initialise le client Notion avec la clé API.
@@ -80,12 +80,41 @@ function construireBlocsPage(script: TikTokScript) {
     },
     {
       object: "block" as const,
-      type: "quote" as const,
-      quote: {
+      type: "callout" as const,
+      callout: {
+        icon: { type: "emoji" as const, emoji: "🔥" },
         rich_text: [
           {
             type: "text" as const,
-            text: { content: script.accroche },
+            text: { content: script.accroche1 },
+            annotations: { bold: true },
+          },
+        ],
+      },
+    },
+    {
+      object: "block" as const,
+      type: "callout" as const,
+      callout: {
+        icon: { type: "emoji" as const, emoji: "💥" },
+        rich_text: [
+          {
+            type: "text" as const,
+            text: { content: script.accroche2 },
+            annotations: { bold: true },
+          },
+        ],
+      },
+    },
+    {
+      object: "block" as const,
+      type: "callout" as const,
+      callout: {
+        icon: { type: "emoji" as const, emoji: "👁️" },
+        rich_text: [
+          {
+            type: "text" as const,
+            text: { content: script.accroche3 },
             annotations: { bold: true },
           },
         ],
@@ -248,7 +277,7 @@ export async function pushToNotion(script: TikTokScript): Promise<void> {
           rich_text: [
             {
               text: {
-                content: script.accroche,
+                content: `🔥 ${script.accroche1}\n💥 ${script.accroche2}\n👁️ ${script.accroche3}`,
               },
             },
           ],
@@ -349,6 +378,82 @@ export async function pushToNotion(script: TikTokScript): Promise<void> {
 }
 
 /**
+ * Envoie un article en backlog dans Notion (résumé simplifié, sans script complet).
+ * Utilisé pour sauvegarder les articles #2 et #3 du classement comme idées de réserve.
+ *
+ * @param scoreResult - Le résultat de scoring de l'article
+ */
+export async function pushBacklogToNotion(scoreResult: ScoreResult): Promise<void> {
+  console.log(
+    `[Notion] 📋 Envoi en backlog : "${scoreResult.article.titre.slice(0, 60)}..."`
+  );
+
+  try {
+    const notion = initialiserNotion();
+    const databaseId = obtenirDatabaseId();
+    const dateAujourdhui = new Date().toISOString().split("T")[0]!;
+
+    await notion.pages.create({
+      parent: { database_id: databaseId },
+      properties: {
+        Titre: {
+          title: [
+            {
+              text: {
+                content: `[BACKLOG] ${scoreResult.article.titre.slice(0, 80)}`,
+              },
+            },
+          ],
+        },
+        Accroche: {
+          rich_text: [
+            {
+              text: {
+                content: `Angle suggéré : ${scoreResult.angleTikTok}`,
+              },
+            },
+          ],
+        },
+        Source: {
+          url: scoreResult.article.url || "https://pubmed.ncbi.nlm.nih.gov/",
+        },
+        "Score Viral": {
+          number: scoreResult.scoreTotal,
+        },
+        Date: {
+          date: {
+            start: dateAujourdhui,
+          },
+        },
+        Statut: {
+          status: {
+            name: "Nouveau",
+          },
+        },
+        DOI: {
+          rich_text: [
+            {
+              text: {
+                content: scoreResult.article.doi || "non-specifie",
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    console.log(
+      `[Notion] ✅ Article backlog "${scoreResult.article.titre.slice(0, 50)}..." sauvegardé`
+    );
+  } catch (erreur: any) {
+    console.log(
+      `[Notion] ⚠️ Erreur lors de l'envoi backlog : ${erreur?.message || erreur}`
+    );
+    /* Ne pas throw — le backlog est non-critique */
+  }
+}
+
+/**
  * Vérifie si un article a déjà été traité en cherchant son DOI dans Notion.
  * Permet d'éviter les doublons entre les exécutions du pipeline.
  *
@@ -356,30 +461,23 @@ export async function pushToNotion(script: TikTokScript): Promise<void> {
  * @returns true si le DOI existe déjà dans la base, false sinon
  */
 export async function isDuplicate(doi: string): Promise<boolean> {
-  if (!doi) {
+  if (!doi || doi === "non-specifie") {
     return false;
   }
 
   try {
     const notion = initialiserNotion();
-    const databaseId = obtenirDatabaseId();
 
-    const resultat = await notion.dataSources.query({
-      data_source_id: databaseId,
-      filter: {
-        property: "DOI",
-        rich_text: {
-          equals: doi,
-        },
-      },
+    const resultat = await notion.search({
+      query: doi,
       page_size: 1,
     });
 
-    const estDoublon = resultat.results.length > 0;
+    const estDoublon = (resultat.results?.length ?? 0) > 0;
 
     if (estDoublon) {
       console.log(
-        `[Notion] ⚠️ Doublon détecté ! Le DOI "${doi}" existe déjà`
+        `[Notion] ⚠️ Doublon détecté ! Le DOI "${doi}" existe déjà dans Notion`
       );
     }
 
