@@ -13,6 +13,9 @@ export default defineConfig({
   // Niveau de log — "log" pour un suivi normal
   logLevel: "log",
 
+  // Durée maximale d'exécution autorisée pour les tâches (en secondes, ici 5 minutes)
+  maxDuration: 300,
+
   // Politique de retry en cas d'échec
   retries: {
     // Activer les retries même en développement local
