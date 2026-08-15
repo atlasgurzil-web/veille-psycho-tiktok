@@ -1,171 +1,88 @@
 /**
- * Service APA RSS — Récupère les articles récents des revues APA via leurs flux RSS.
- *
- * Parse les flux RSS de l'American Psychological Association pour extraire
- * les dernières publications en psychologie sociale, clinique et des médias.
+ * Service APA — Récupère les articles de référence de l'APA (American Psychological Association)
+ * et des plus grandes revues mondiales de psychologie sociale et comportementale.
  */
 
-import Parser from "rss-parser";
 import type { Article } from "../types/index.js";
 
-/** Liste des flux RSS APA à surveiller */
-const FLUX_APA = [
-  {
-    url: "https://psycnet.apa.org/journals/amp/rss",
-    nom: "American Psychologist",
-  },
-  {
-    url: "https://psycnet.apa.org/journals/psp/rss",
-    nom: "Journal of Personality and Social Psychology",
-  },
-  {
-    url: "https://psycnet.apa.org/journals/ppm/rss",
-    nom: "Psychology of Popular Media",
-  },
-];
+function extraireBalise(xml: string, balise: string): string {
+  const regex = new RegExp(`<${balise}[^>]*>(.*?)</${balise}>`, "s");
+  const match = xml.match(regex);
+  return match?.[1]?.trim() ?? "";
+}
 
-/**
- * Génère un identifiant à partir du lien de l'article.
- * Si pas de DOI réel, on crée un identifiant basé sur l'URL.
- *
- * @param lien - Le lien vers l'article
- * @returns Un identifiant unique dérivé du lien
- */
-function genererIdDepuisLien(lien: string): string {
-  try {
-    /* Extrait la partie significative de l'URL pour créer un pseudo-DOI */
-    const url = new URL(lien);
-    const chemin = url.pathname.replace(/^\//, "").replace(/\//g, ".");
-    return `apa/${chemin}`;
-  } catch {
-    /* Si l'URL est invalide, utilise un hash simple du lien */
-    return `apa/${lien.replace(/[^a-zA-Z0-9]/g, "").slice(0, 40)}`;
+function extraireToutesBalises(xml: string, balise: string): string[] {
+  const regex = new RegExp(`<${balise}[^>]*>(.*?)</${balise}>`, "gs");
+  const resultats: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(xml)) !== null) {
+    resultats.push(match[1]?.trim() ?? "");
   }
+  return resultats;
 }
 
 /**
- * Nettoie le HTML d'un texte (description RSS souvent en HTML).
- * Supprime les balises HTML et décode les entités courantes.
+ * Récupère les publications récentes des revues phares de l'APA et de psychologie humaine.
  *
- * @param texte - Le texte potentiellement en HTML
- * @returns Le texte nettoyé, sans balises
- */
-function nettoyerHTML(texte: string): string {
-  if (!texte) return "";
-  return texte
-    /* Supprime toutes les balises HTML */
-    .replace(/<[^>]*>/g, "")
-    /* Décode les entités HTML courantes */
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    /* Nettoie les espaces multiples */
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
- * Récupère et parse un flux RSS APA individuel.
- *
- * @param fluxUrl - L'URL du flux RSS
- * @param fluxNom - Le nom du journal (pour les logs)
- * @returns Liste d'articles extraits du flux
- */
-async function parserFluxAPA(
-  fluxUrl: string,
-  fluxNom: string
-): Promise<Article[]> {
-  const parser = new Parser({
-    /* Timeout de 10 secondes pour éviter les blocages */
-    timeout: 10000,
-    headers: {
-      /* Identifiant utilisateur pour être poli avec l'API */
-      "User-Agent": "VeillePsychoTikTok/1.0 (recherche académique)",
-    },
-  });
-
-  try {
-    console.log(`[APA RSS] 📡 Récupération du flux "${fluxNom}"...`);
-
-    const flux = await parser.parseURL(fluxUrl);
-    const articles: Article[] = [];
-
-    if (!flux.items || flux.items.length === 0) {
-      console.log(`[APA RSS] ℹ️ Aucun article dans le flux "${fluxNom}"`);
-      return [];
-    }
-
-    for (const item of flux.items) {
-      /* Ignore les items sans titre */
-      if (!item.title) continue;
-
-      const titre = nettoyerHTML(item.title);
-      const abstract = nettoyerHTML(item.contentSnippet || item.content || item.summary || "");
-      const lien = item.link || "";
-      const datePublication = item.pubDate || item.isoDate || "date inconnue";
-
-      /* Ignore les articles sans abstract exploitable */
-      if (!abstract || abstract.length < 50) {
-        console.log(
-          `[APA RSS] ⚠️ Article "${titre.slice(0, 50)}..." ignoré (abstract trop court ou absent)`
-        );
-        continue;
-      }
-
-      /* Essaie d'extraire un DOI depuis le lien */
-      const doiMatch = lien.match(/doi\.org\/(.*)/);
-      const doi = doiMatch?.[1] ?? genererIdDepuisLien(lien);
-
-      articles.push({
-        id: doi,
-        titre,
-        abstract,
-        auteurs: [],
-        datePublication: datePublication ?? "date inconnue",
-        doi,
-        url: lien,
-        source: "apa",
-      });
-    }
-
-    console.log(
-      `[APA RSS] ✅ ${articles.length} articles extraits de "${fluxNom}"`
-    );
-    return articles;
-  } catch (erreur) {
-    /* Si un flux est en panne ou inaccessible, on continue avec les autres */
-    console.log(
-      `[APA RSS] ⚠️ Impossible de récupérer le flux "${fluxNom}" — ${erreur}`
-    );
-    console.log(
-      `[APA RSS] ℹ️ Ce flux sera réessayé lors de la prochaine exécution`
-    );
-    return [];
-  }
-}
-
-/**
- * Fonction principale — Récupère les articles récents depuis tous les flux RSS APA.
- * Si un flux est en panne, il est simplement ignoré (les autres continuent).
- *
- * @returns Liste combinée d'articles de tous les flux APA
+ * @returns Liste d'articles scientifiques avec résumé complet
  */
 export async function fetchAPAArticles(): Promise<Article[]> {
-  console.log("[APA RSS] 🚀 Début de la collecte des articles APA...");
+  console.log("[APA] 🚀 Recherche des publications récentes dans les revues officielles de l'APA...");
 
-  const tousLesArticles: Article[] = [];
+  // Revues officielles de l'APA et de référence mondiale
+  const revues = [
+    '"Am Psychol"[ta]',          // American Psychologist (Revue officielle APA)
+    '"J Pers Soc Psychol"[ta]',   // Journal of Personality and Social Psychology (APA)
+    '"Psychol Sci"[ta]',          // Psychological Science
+    '"Nat Hum Behav"[ta]',        // Nature Human Behaviour
+    '"Trends Cogn Sci"[ta]'       // Trends in Cognitive Sciences
+  ].join(" OR ");
 
-  /* Récupère chaque flux séquentiellement pour éviter de surcharger l'API */
-  for (const flux of FLUX_APA) {
-    const articles = await parserFluxAPA(flux.url, flux.nom);
-    tousLesArticles.push(...articles);
+  try {
+    const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(revues)}&retmode=json&reldate=30&retmax=20&sort=pub_date`;
+    const searchRes = await fetch(searchUrl);
+    const searchData = await searchRes.json();
+    const pmids: string[] = searchData?.esearchresult?.idlist || [];
+
+    console.log(`[APA] ✅ ${pmids.length} études trouvées dans les revues phares de l'APA.`);
+    if (pmids.length === 0) return [];
+
+    const fetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${pmids.join(",")}&retmode=xml`;
+    const fetchRes = await fetch(fetchUrl);
+    const xml = await fetchRes.text();
+
+    const articlesXml = xml.split("<PubmedArticle>");
+    const articles: Article[] = [];
+
+    for (const artXml of articlesXml) {
+      if (!artXml.includes("</PubmedArticle>")) continue;
+
+      const pmid = extraireBalise(artXml, "PMID");
+      const titre = extraireBalise(artXml, "ArticleTitle");
+      const abstractParts = extraireToutesBalises(artXml, "AbstractText");
+      const abstract = abstractParts.length > 0 ? abstractParts.join(" ") : extraireBalise(artXml, "Abstract");
+      
+      const doiMatch = artXml.match(/<ArticleId IdType="doi">(.*?)<\/ArticleId>/s) || artXml.match(/<ELocationID EIdType="doi"[^>]*>(.*?)<\/ELocationID>/s);
+      const doi = doiMatch?.[1]?.trim() || `apa/${pmid}`;
+
+      if (titre && abstract && abstract.length > 80) {
+        articles.push({
+          id: pmid,
+          titre,
+          abstract,
+          auteurs: [],
+          datePublication: "date récente",
+          doi,
+          url: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
+          source: "apa",
+        });
+      }
+    }
+
+    console.log(`[APA] ✅ ${articles.length} publications APA exploitables avec résumé complet.`);
+    return articles;
+  } catch (err: any) {
+    console.log(`[APA] ⚠️ Erreur lors de la récupération APA : ${err?.message || err}`);
+    return [];
   }
-
-  console.log(
-    `[APA RSS] 🏁 Collecte APA terminée : ${tousLesArticles.length} articles au total`
-  );
-  return tousLesArticles;
 }
