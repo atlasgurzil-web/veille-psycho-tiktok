@@ -5,7 +5,7 @@ import { defineConfig } from "@trigger.dev/sdk/v3";
 
 export default defineConfig({
   // Identifiant unique du projet sur Trigger.dev
-  project: "veille-psycho-tiktok",
+  project: "proj_yfkcltxerzfxycklxume",
 
   // Environnement d'exécution Node.js
   runtime: "node",
