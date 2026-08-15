@@ -8,6 +8,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { ScoreResult, TikTokScript } from "../types/index.js";
 import { buildScriptPrompt } from "../prompts/script-prompt.js";
+import { ENV } from "../config/env.js";
 
 /**
  * Nettoie la réponse IA pour extraire le JSON.
@@ -99,8 +100,8 @@ export async function generateScript(
     `[Script] 🎬 Génération du script pour : "${scoreResult.article.titre.slice(0, 60)}..."`
   );
 
-  const geminiKey = process.env.GOOGLE_AI_API_KEY;
-  const groqKey = process.env.GROQ_API_KEY;
+  const geminiKey = ENV.GOOGLE_AI_API_KEY;
+  const groqKey = ENV.GROQ_API_KEY;
 
   if (!geminiKey && !groqKey) {
     throw new Error(

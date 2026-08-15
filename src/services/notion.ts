@@ -7,6 +7,7 @@
 
 import { Client } from "@notionhq/client";
 import type { TikTokScript, ScoreResult } from "../types/index.js";
+import { ENV } from "../config/env.js";
 
 /**
  * Initialise le client Notion avec la clé API.
@@ -14,7 +15,7 @@ import type { TikTokScript, ScoreResult } from "../types/index.js";
  * @returns L'instance Notion configurée
  */
 function initialiserNotion(): Client {
-  const apiKey = process.env.NOTION_API_KEY;
+  const apiKey = ENV.NOTION_API_KEY;
   if (!apiKey) {
     throw new Error(
       "[Notion] ❌ NOTION_API_KEY manquante ! Configurez-la dans votre fichier .env"
@@ -30,7 +31,7 @@ function initialiserNotion(): Client {
  * @returns L'identifiant de la base de données Notion
  */
 function obtenirDatabaseId(): string {
-  const databaseId = process.env.NOTION_DATABASE_ID;
+  const databaseId = ENV.NOTION_DATABASE_ID;
   if (!databaseId) {
     throw new Error(
       "[Notion] ❌ NOTION_DATABASE_ID manquant ! Configurez-le dans votre fichier .env"

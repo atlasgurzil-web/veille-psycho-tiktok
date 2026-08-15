@@ -9,6 +9,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { Article, ScoreResult } from "../types/index.js";
 import { buildScoringPrompt } from "../prompts/scoring-prompt.js";
+import { ENV } from "../config/env.js";
 
 /**
  * Pause utilitaire.
@@ -151,8 +152,8 @@ async function evaluerArticleIndividuel(
 export async function scoreArticles(
   articles: Article[]
 ): Promise<ScoreResult[]> {
-  const groqKey = process.env.GROQ_API_KEY;
-  const geminiKey = process.env.GOOGLE_AI_API_KEY;
+  const groqKey = ENV.GROQ_API_KEY;
+  const geminiKey = ENV.GOOGLE_AI_API_KEY;
 
   console.log(
     `[Scoring] ⚡ Démarrage du scoring turbo de ${articles.length} articles (traitement parallèle)...`
