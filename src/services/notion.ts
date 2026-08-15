@@ -1,9 +1,8 @@
 /**
  * Service Notion — Envoie les scripts TikTok sur Notion via l'API officielle.
  *
- * Gère la création de pages dans la base de données Notion et
- * la vérification des doublons via le DOI des articles.
- * Utilise le SDK officiel @notionhq/client (stable, bien documenté).
+ * Crée les pages de scripts avec une fiche de tournage structurée
+ * directement dans le corps de la page pour une lecture facile sur mobile/desktop.
  */
 
 import { Client } from "@notionhq/client";
@@ -11,10 +10,8 @@ import type { TikTokScript } from "../types/index.js";
 
 /**
  * Initialise le client Notion avec la clé API.
- * La clé se trouve dans ton fichier .env sous NOTION_API_KEY.
  *
  * @returns L'instance Notion configurée
- * @throws Error si la clé API est manquante
  */
 function initialiserNotion(): Client {
   const apiKey = process.env.NOTION_API_KEY;
@@ -28,10 +25,9 @@ function initialiserNotion(): Client {
 }
 
 /**
- * Vérifie que l'ID de la base de données Notion est configuré.
+ * Récupère l'ID de la base de données Notion depuis l'environnement.
  *
  * @returns L'identifiant de la base de données Notion
- * @throws Error si NOTION_DATABASE_ID n'est pas défini
  */
 function obtenirDatabaseId(): string {
   const databaseId = process.env.NOTION_DATABASE_ID;
@@ -44,14 +40,188 @@ function obtenirDatabaseId(): string {
 }
 
 /**
- * Envoie un script TikTok sur Notion en créant une nouvelle page.
- * Chaque champ du script est mappé vers une propriété de la base de données.
+ * Construit les blocs visuels pour le corps de la page Notion (Fiche de tournage).
+ *
+ * @param script - Le script complet à formater
+ * @returns Tableau de blocs au format Notion
+ */
+function construireBlocsPage(script: TikTokScript) {
+  return [
+    // En-tête / Callout de tournage
+    {
+      object: "block" as const,
+      type: "callout" as const,
+      callout: {
+        icon: { type: "emoji" as const, emoji: "🎬" },
+        rich_text: [
+          {
+            type: "text" as const,
+            text: {
+              content: `FICHE DE TOURNAGE | Format : ${script.format.toUpperCase()} | Durée : ${script.dureeCible}\n💡 Conseil : ${script.conseilTournage || "Ton direct et posé"}`,
+            },
+          },
+        ],
+      },
+    },
+    { object: "block" as const, type: "divider" as const, divider: {} },
+
+    // 1. Accroche
+    {
+      object: "block" as const,
+      type: "heading_2" as const,
+      heading_2: {
+        rich_text: [
+          {
+            type: "text" as const,
+            text: { content: "🪝 1. ACCROCHE (0-3 secondes)" },
+          },
+        ],
+      },
+    },
+    {
+      object: "block" as const,
+      type: "quote" as const,
+      quote: {
+        rich_text: [
+          {
+            type: "text" as const,
+            text: { content: script.accroche },
+            annotations: { bold: true },
+          },
+        ],
+      },
+    },
+
+    // 2. Le Concept
+    {
+      object: "block" as const,
+      type: "heading_2" as const,
+      heading_2: {
+        rich_text: [
+          {
+            type: "text" as const,
+            text: { content: "🧠 2. LE CONCEPT PSY (3-10 secondes)" },
+          },
+        ],
+      },
+    },
+    {
+      object: "block" as const,
+      type: "paragraph" as const,
+      paragraph: {
+        rich_text: [
+          {
+            type: "text" as const,
+            text: { content: script.conceptPsy },
+          },
+        ],
+      },
+    },
+
+    // 3. La Preuve
+    {
+      object: "block" as const,
+      type: "heading_2" as const,
+      heading_2: {
+        rich_text: [
+          {
+            type: "text" as const,
+            text: { content: "📊 3. LA PREUVE SCIENTIFIQUE (10-20 secondes)" },
+          },
+        ],
+      },
+    },
+    {
+      object: "block" as const,
+      type: "paragraph" as const,
+      paragraph: {
+        rich_text: [
+          {
+            type: "text" as const,
+            text: { content: script.laPreuve },
+          },
+        ],
+      },
+    },
+
+    // 4. L'Insight
+    {
+      object: "block" as const,
+      type: "heading_2" as const,
+      heading_2: {
+        rich_text: [
+          {
+            type: "text" as const,
+            text: { content: "💡 4. L'INSIGHT / CE QUE ÇA CHANGE (20-30 secondes)" },
+          },
+        ],
+      },
+    },
+    {
+      object: "block" as const,
+      type: "paragraph" as const,
+      paragraph: {
+        rich_text: [
+          {
+            type: "text" as const,
+            text: { content: script.insight },
+          },
+        ],
+      },
+    },
+
+    // 5. Call To Action
+    {
+      object: "block" as const,
+      type: "heading_2" as const,
+      heading_2: {
+        rich_text: [
+          {
+            type: "text" as const,
+            text: { content: "❓ 5. APPEL À L'ACTION (30-35 secondes)" },
+          },
+        ],
+      },
+    },
+    {
+      object: "block" as const,
+      type: "quote" as const,
+      quote: {
+        rich_text: [
+          {
+            type: "text" as const,
+            text: { content: script.cta },
+          },
+        ],
+      },
+    },
+
+    { object: "block" as const, type: "divider" as const, divider: {} },
+
+    // Hashtags & Source
+    {
+      object: "block" as const,
+      type: "paragraph" as const,
+      paragraph: {
+        rich_text: [
+          {
+            type: "text" as const,
+            text: { content: `🏷️ Hashtags : ${script.hashtags.join(" ")}\n🔗 Source PubMed / DOI : ${script.sourceUrl || script.doi}` },
+          },
+        ],
+      },
+    },
+  ];
+}
+
+/**
+ * Envoie un script TikTok sur Notion en créant une nouvelle page complète.
  *
  * @param script - Le script TikTok complet à envoyer
  */
 export async function pushToNotion(script: TikTokScript): Promise<void> {
   console.log(
-    `[Notion] 📤 Envoi du script "${script.titreInterne}" vers Notion...`
+    `[Notion] 📤 Envoi de la fiche de tournage "${script.titreInterne}" vers Notion...`
   );
 
   try {
@@ -61,11 +231,10 @@ export async function pushToNotion(script: TikTokScript): Promise<void> {
     /* Date du jour au format ISO pour la propriété Date */
     const dateAujourdhui = new Date().toISOString().split("T")[0]!;
 
-    /* Crée la page avec toutes les propriétés */
+    /* Crée la page avec ses propriétés et son contenu visuel structuré */
     await notion.pages.create({
       parent: { database_id: databaseId },
       properties: {
-        /* Titre — propriété de type "title" */
         Titre: {
           title: [
             {
@@ -75,7 +244,6 @@ export async function pushToNotion(script: TikTokScript): Promise<void> {
             },
           ],
         },
-        /* Accroche — propriété de type "rich_text" */
         Accroche: {
           rich_text: [
             {
@@ -85,7 +253,6 @@ export async function pushToNotion(script: TikTokScript): Promise<void> {
             },
           ],
         },
-        /* Concept Psy — propriété de type "rich_text" */
         "Concept Psy": {
           rich_text: [
             {
@@ -95,7 +262,6 @@ export async function pushToNotion(script: TikTokScript): Promise<void> {
             },
           ],
         },
-        /* La Preuve — propriété de type "rich_text" */
         "La Preuve": {
           rich_text: [
             {
@@ -105,7 +271,6 @@ export async function pushToNotion(script: TikTokScript): Promise<void> {
             },
           ],
         },
-        /* Insight — propriété de type "rich_text" */
         Insight: {
           rich_text: [
             {
@@ -115,7 +280,6 @@ export async function pushToNotion(script: TikTokScript): Promise<void> {
             },
           ],
         },
-        /* CTA — propriété de type "rich_text" */
         CTA: {
           rich_text: [
             {
@@ -125,19 +289,16 @@ export async function pushToNotion(script: TikTokScript): Promise<void> {
             },
           ],
         },
-        /* Durée Cible — propriété de type "select" */
         "Durée Cible": {
           select: {
             name: script.dureeCible,
           },
         },
-        /* Format — propriété de type "select" */
         Format: {
           select: {
             name: script.format,
           },
         },
-        /* Hashtags — propriété de type "rich_text" */
         Hashtags: {
           rich_text: [
             {
@@ -147,46 +308,42 @@ export async function pushToNotion(script: TikTokScript): Promise<void> {
             },
           ],
         },
-        /* Source — propriété de type "url" */
         Source: {
-          url: script.sourceUrl,
+          url: script.sourceUrl || "https://pubmed.ncbi.nlm.nih.gov/",
         },
-        /* Score Viral — propriété de type "number" */
         "Score Viral": {
           number: script.scoreViral,
         },
-        /* Date — propriété de type "date" */
         Date: {
           date: {
             start: dateAujourdhui,
           },
         },
-        /* Statut — propriété de type "status" */
         Statut: {
           status: {
             name: "Nouveau",
           },
         },
-        /* DOI — propriété de type "rich_text" (pour la déduplication) */
         DOI: {
           rich_text: [
             {
               text: {
-                content: script.doi,
+                content: script.doi || "non-specifie",
               },
             },
           ],
         },
       },
+      children: construireBlocsPage(script),
     });
 
     console.log(
-      `[Notion] ✅ Script "${script.titreInterne}" envoyé avec succès sur Notion`
+      `[Notion] ✅ Fiche de tournage "${script.titreInterne}" créée avec succès dans Notion !`
     );
-  } catch (erreur) {
-    console.log(`[Notion] ❌ Erreur lors de l'envoi sur Notion : ${erreur}`);
+  } catch (erreur: any) {
+    console.log(`[Notion] ❌ Erreur lors de l'envoi sur Notion : ${erreur?.message || erreur}`);
     throw new Error(
-      `[Notion] Impossible d'envoyer le script "${script.titreInterne}" — ${erreur}`
+      `[Notion] Impossible d'envoyer le script "${script.titreInterne}" — ${erreur?.message || erreur}`
     );
   }
 }
@@ -199,7 +356,6 @@ export async function pushToNotion(script: TikTokScript): Promise<void> {
  * @returns true si le DOI existe déjà dans la base, false sinon
  */
 export async function isDuplicate(doi: string): Promise<boolean> {
-  /* Si pas de DOI, on ne peut pas vérifier */
   if (!doi) {
     return false;
   }
@@ -208,7 +364,6 @@ export async function isDuplicate(doi: string): Promise<boolean> {
     const notion = initialiserNotion();
     const databaseId = obtenirDatabaseId();
 
-    /* Cherche le DOI dans la base Notion */
     const resultat = await notion.dataSources.query({
       data_source_id: databaseId,
       filter: {
@@ -229,10 +384,9 @@ export async function isDuplicate(doi: string): Promise<boolean> {
     }
 
     return estDoublon;
-  } catch (erreur) {
-    /* En cas d'erreur, on laisse passer (mieux vaut un doublon qu'un article manqué) */
+  } catch (erreur: any) {
     console.log(
-      `[Notion] ⚠️ Erreur lors de la vérification de doublon : ${erreur}`
+      `[Notion] ⚠️ Erreur lors de la vérification de doublon : ${erreur?.message || erreur}`
     );
     return false;
   }

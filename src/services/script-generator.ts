@@ -112,6 +112,7 @@ export async function generateScript(
       cta: scriptBrut.cta || "",
       dureeCible: normaliserDuree(scriptBrut.duree_cible),
       format: normaliserFormat(scriptBrut.format),
+      conseilTournage: scriptBrut.conseil_tournage || "Face caméra avec un ton direct et calme",
       hashtags: Array.isArray(scriptBrut.hashtags)
         ? scriptBrut.hashtags
         : [],

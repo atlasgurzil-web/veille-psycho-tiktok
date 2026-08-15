@@ -1,62 +1,49 @@
 /**
- * Prompt de génération de script TikTok — Crée un script structuré en français.
- * Utilisé par le service de génération pour demander à Gemini de rédiger
- * un script TikTok complet à partir d'un article scientifique.
+ * Prompt de génération de scripts TikTok — Rédige une fiche de tournage prête à l'emploi.
  */
 
-/**
- * Construit le prompt de génération de script TikTok.
- * Le persona est un créateur TikTok français spécialisé en psychologie,
- * inspiré par Dr. Julie Smith, @encoreunepsy et @baptiste.neuro.
- *
- * @param titre - Le titre de l'article scientifique
- * @param abstract - Le résumé / abstract de l'article
- * @param angle - L'angle TikTok suggéré par le scoring
- * @returns Le prompt complet à envoyer à Gemini
- */
 export function buildScriptPrompt(
   titre: string,
   abstract: string,
   angle: string
 ): string {
-  return `Tu es un créateur TikTok français spécialisé en psychologie scientifique vulgarisée.
-Tu t'inspires du style de Dr. Julie Smith (clarté clinique), @encoreunepsy (ton accessible et bienveillant) et @baptiste.neuro (énergie et analogies percutantes).
+  return `Tu es un créateur de contenu TikTok francophone spécialisé en neurosciences et psychologie comportementale de haut niveau (style vulgarisation percutante, moderne, sans condescendance).
 
-Ton objectif : transformer un article de recherche en un script TikTok captivant, rigoureux mais accessible, en français.
+Tu dois transformer cette étude scientifique réelle en un script TikTok captivant, mémorable et scientifiquement irréprochable.
 
-ARTICLE SOURCE :
-Titre : ${titre}
-Abstract : ${abstract}
-Angle suggéré : ${angle}
+INFORMATIONS DE L'ÉTUDE RÉELLE :
+- Titre original : ${titre}
+- Résumé scientifique : ${abstract}
+- Angle d'attaque suggéré : ${angle}
 
 STRUCTURE OBLIGATOIRE DU SCRIPT :
+1. ACCROCHE (0-3 secondes) :
+   - Une phrase choc qui casse le scroll. Pas de "Bonjour à tous" ni de question bateau.
+   - Parle directement au spectateur ("tu").
+2. LE CONCEPT (3-10 secondes) :
+   - Pose le problème ou le phénomène psychologique en termes simples de la vie de tous les jours.
+3. LA PREUVE SCIENTIFIQUE (10-20 secondes) :
+   - Mentionne l'expérience ou les résultats concrets de l'étude pour asseoir une autorité totale.
+4. L'INSIGHT / LE BÉNÉFICE (20-30 secondes) :
+   - Qu'est-ce que le spectateur doit faire ou comprendre différemment dans sa vie dès aujourd'hui ?
+5. LE CALL TO ACTION (30-35 secondes) :
+   - Une question ouverte pour déclencher des débats en commentaires ou inciter à s'abonner pour plus d'études décryptées.
 
-🪝 ACCROCHE (0-3s) — Une phrase choc qui arrête le scroll. Question provocante, affirmation surprenante, ou "Tu savais que...". Doit créer un micro-choc cognitif.
+CONSEILS DE TOURNAGE :
+- Donne une indication claire de ton ou d'action visuelle (ex: "Ton calme et direct face caméra", "Montre ton téléphone").
 
-🧠 CONCEPT PSY (3-10s) — Explication claire du concept psychologique en langage courant. Utilise une analogie du quotidien si possible. Pas de jargon.
-
-📊 LA PREUVE (10-15s) — Cite l'étude ou le chiffre clé de manière percutante. "Des chercheurs de [université] ont montré que..." ou "Dans une étude sur [N] participants...".
-
-💡 L'INSIGHT (15-20s) — L'application concrète dans la vie de tous les jours. Le moment "ah mais oui c'est trop vrai". Connecte la science au vécu du spectateur.
-
-❓ CTA (20-25s) — Appel à l'action engageant. Question ouverte en commentaire, "Follow pour plus de psycho", ou "Envoie à quelqu'un qui...".
-
-CONSIGNES SUPPLÉMENTAIRES :
-- Génère aussi : la durée cible idéale (15s, 30s ou 60s), le format recommandé (face caméra, voix off, ou green screen), 6 hashtags pertinents en français, et un titre interne court pour l'organisation.
-- Le ton doit être : conversationnel, bienveillant, jamais condescendant, légèrement fasciné.
-- Chaque section du script doit être naturelle à lire à voix haute.
-
-Réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks :
+Réponds UNIQUEMENT en JSON valide sans aucun formatage Markdown :
 {
-  "titre": "Titre accrocheur du TikTok",
-  "accroche": "La phrase d'accroche complète (0-3s)",
-  "concept_psy": "L'explication du concept (3-10s)",
-  "la_preuve": "La preuve scientifique (10-15s)",
-  "insight": "L'insight applicable (15-20s)",
-  "cta": "L'appel à l'action (20-25s)",
-  "duree_cible": "15s ou 30s ou 60s",
-  "format": "face caméra ou voix off ou green screen",
-  "hashtags": ["#psycho", "#santemental", "#developpementpersonnel", "#science", "#tiktokeducation", "#psyclinique"],
-  "titre_interne": "Titre court interne"
+  "titre": "Titre court et percutant de la vidéo",
+  "titre_interne": "Titre d'organisation pour Notion",
+  "accroche": "La phrase exacte des 3 premières secondes",
+  "concept_psy": "L'explication vulgarisée en 2-3 phrases",
+  "la_preuve": "La preuve scientifique résumée",
+  "insight": "Ce que ça change concrètement pour le spectateur",
+  "cta": "L'appel à l'action pour les commentaires",
+  "duree_cible": "30s",
+  "format": "face caméra",
+  "conseil_tournage": "Indication visuelle ou de ton pour le créateur",
+  "hashtags": ["#psychologie", "#cerveau", "#neurosciences", "#developpementpersonnel", "#etude", "#apprendre"]
 }`;
 }

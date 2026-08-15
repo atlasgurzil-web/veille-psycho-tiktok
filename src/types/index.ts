@@ -93,6 +93,9 @@ export interface TikTokScript {
   /** Format de tournage recommandé */
   format: "face caméra" | "voix off" | "green screen";
 
+  /** Conseil pratique de mise en scène / ton pour le tournage */
+  conseilTournage?: string;
+
   /** Hashtags suggérés pour maximiser la portée */
   hashtags: string[];
 
